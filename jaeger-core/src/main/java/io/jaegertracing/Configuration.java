@@ -179,10 +179,6 @@ public class Configuration {
   private Map<String, String> tracerTags;
   private boolean useTraceId128Bit;
 
-  /**
-   * lazy singleton JaegerTracer initialized in getTracer() method.
-   */
-  private JaegerTracer tracer;
 
   public Configuration(String serviceName) {
     this.serviceName = JaegerTracer.Builder.checkValidServiceName(serviceName);
@@ -238,20 +234,9 @@ public class Configuration {
   }
 
   public synchronized JaegerTracer getTracer() {
-    if (tracer != null) {
-      return tracer;
-    }
-
-    tracer = getTracerBuilder().build();
+    JaegerTracer tracer = getTracerBuilder().build();
     log.info("Initialized tracer={}", tracer);
-
     return tracer;
-  }
-
-  public synchronized void closeTracer() {
-    if (tracer != null) {
-      tracer.close();
-    }
   }
 
   private MetricsFactory loadMetricsFactory() {
@@ -580,11 +565,6 @@ public class Configuration {
   @Getter
   public static class SenderConfiguration {
     /**
-     * A custom sender set by our consumers. If set, nothing else has effect. Optional.
-     */
-    private Sender sender;
-
-    /**
      * The Agent Host. Has no effect if the sender is set. Optional.
      */
     private String agentHost;
@@ -648,15 +628,11 @@ public class Configuration {
     }
 
     /**
-     * Returns a sender if one was given when creating the configuration, or attempts to create a sender based on the
-     * configuration's state.
+     * Returns a sender based on the configuration's state.
      * @return the sender passed via the constructor or a properly configured sender
      */
     public Sender getSender() {
-      if (sender == null) {
-        sender = SenderResolver.resolve(this);
-      }
-      return sender;
+      return SenderResolver.resolve(this);
     }
 
     /**

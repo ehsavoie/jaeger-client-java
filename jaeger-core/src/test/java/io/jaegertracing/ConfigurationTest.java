@@ -313,9 +313,12 @@ public class ConfigurationTest {
   @Test
   public void testDefaultTracer() {
     Configuration configuration = new Configuration("name");
-    assertNotNull(configuration.getTracer());
-    assertNotNull(configuration.getTracer());
-    configuration.closeTracer();
+    JaegerTracer tracer = configuration.getTracer();
+    assertNotNull(tracer);
+    tracer.close();
+    tracer = configuration.getTracer();
+    assertNotNull(tracer);
+    tracer.close();
   }
 
   @Test(expected = IllegalStateException.class)

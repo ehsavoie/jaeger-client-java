@@ -30,6 +30,7 @@ import io.jaegertracing.crossdock.api.StartTraceRequest;
 import io.jaegertracing.crossdock.api.TraceResponse;
 import io.jaegertracing.crossdock.resources.behavior.TraceBehavior;
 import io.jaegertracing.internal.JaegerSpanContext;
+import io.jaegertracing.internal.JaegerTracer;
 import io.jaegertracing.internal.samplers.ConstSampler;
 import io.opentracing.Scope;
 import io.opentracing.noop.NoopTracerFactory;
@@ -86,8 +87,9 @@ public class TraceBehaviorResourceTest {
     Configuration configuration = new Configuration(SERVICE_NAME).withSampler(
         new SamplerConfiguration().withType(ConstSampler.TYPE).withParam(0))
         .withReporter(new ReporterConfiguration().withLogSpans(true));
-    server = new JerseyServer("127.0.0.1", port, configuration,
-        Collections.singletonList(new TraceBehaviorResource(configuration.getTracer())));
+    JaegerTracer tracer = configuration.getTracer();
+    server = new JerseyServer("127.0.0.1", port, tracer,
+        Collections.singletonList(new TraceBehaviorResource(tracer)));
     hostPort = String.format("127.0.0.1:%d", port);
     behavior = new TraceBehavior(server.getTracer());
   }

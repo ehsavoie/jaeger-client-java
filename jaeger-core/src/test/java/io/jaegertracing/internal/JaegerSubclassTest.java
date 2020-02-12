@@ -170,6 +170,6 @@ public class JaegerSubclassTest {
     Assert.assertTrue(tracer.scopeManager().active().span() instanceof CustomSpan);
     Assert.assertTrue(tracer.scopeManager().active().span().context() instanceof CustomSpanContext);
     scope.close();
-    config.closeTracer();
+    tracer.close();
   }
 }

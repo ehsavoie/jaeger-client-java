@@ -22,6 +22,7 @@ import io.jaegertracing.crossdock.resources.behavior.ExceptionMapper;
 import io.jaegertracing.crossdock.resources.behavior.http.EndToEndBehaviorResource;
 import io.jaegertracing.crossdock.resources.behavior.http.TraceBehaviorResource;
 import io.jaegertracing.crossdock.resources.health.HealthResource;
+import io.jaegertracing.internal.JaegerTracer;
 import io.jaegertracing.internal.samplers.ConstSampler;
 import io.jaegertracing.spi.Sender;
 import io.jaegertracing.thrift.internal.senders.HttpSender;
@@ -59,17 +60,17 @@ public class JerseyServer {
 
   private final HttpServer server;
 
-  private final Configuration config;
+  private final JaegerTracer tracer;
 
-  public JerseyServer(String host, int port, Configuration configuration, List<Object> resources)
+  public JerseyServer(String host, int port, JaegerTracer tracer, List<Object> resources)
       throws IOException {
-    this.config = configuration;
+    this.tracer = tracer;
 
     // create a resource config that scans for JAX-RS resources and providers
     final ResourceConfig rc = new ResourceConfig();
 
     resources.forEach(rc::register);
-    rc.register(new ServerTracingDynamicFeature.Builder(config.getTracer())
+    rc.register(new ServerTracingDynamicFeature.Builder(tracer)
           .withTraceSerialization(false)
           .build())
         .register(LoggingFilter.class)
@@ -79,12 +80,12 @@ public class JerseyServer {
     WebappContext context = new WebappContext("grizzly web context", "");
     context.addServlet("jaxrs", new ServletContainer(rc))
         .addMapping("/", "/*");
-    context.addFilter("tracingFilter", new SpanFinishingFilter(configuration.getTracer()))
+    context.addFilter("tracingFilter", new SpanFinishingFilter(tracer))
         .addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), "/*");
 
     server = HttpServer.createSimpleServer(".", host, port);
     context.deploy(server);
-    client = initializeClient(config);
+    client = initializeClient(tracer);
     server.start();
   }
 
@@ -92,10 +93,10 @@ public class JerseyServer {
     server.addListener(networkListener);
   }
 
-  private static Client initializeClient(final Configuration config) {
+  private static Client initializeClient(final JaegerTracer tracer) {
     return ClientBuilder.newClient()
         .register(ExceptionMapper.class)
-        .register(new ClientTracingFeature.Builder(config.getTracer()).build())
+        .register(new ClientTracingFeature.Builder(tracer).build())
         .register(JacksonFeature.class);
   }
 
@@ -109,7 +110,7 @@ public class JerseyServer {
   }
 
   public Tracer getTracer() {
-    return config.getTracer();
+    return tracer;
   }
 
   public static void main(String[] args) throws Exception {
@@ -119,9 +120,9 @@ public class JerseyServer {
     Configuration configuration = new Configuration(serviceName)
         .withSampler(new SamplerConfiguration().withType(ConstSampler.TYPE).withParam(0))
         .withReporter(new ReporterConfiguration().withLogSpans(true));
-
-    JerseyServer server = new JerseyServer("0.0.0.0", 8081, configuration,
-        Arrays.asList(new TraceBehaviorResource(configuration.getTracer()),
+    JaegerTracer tracer = configuration.getTracer();
+    JerseyServer server = new JerseyServer("0.0.0.0", 8081, tracer,
+        Arrays.asList(new TraceBehaviorResource(tracer),
             new EndToEndBehaviorResource(new EndToEndBehavior(getEvn(SAMPLING_HOST_PORT, "jaeger-agent:5778"),
                 "crossdock-" + serviceName,
                 senderFromEnv(getEvn(COLLECTOR_HOST_PORT, "jaeger-collector:14268"),
